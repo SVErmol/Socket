@@ -1,0 +1,6 @@
+engine_sqlite: sqlite:///mydatabase.db
+engine_postgres: postgresql+psycopg2://postgres:123@localhost/postgres
+salt: 23kl423lkn443kn43l3naefknt4knt3l
+port: 8000
+address: 127.0.0.1
+client: base.Client((address, 11211))
