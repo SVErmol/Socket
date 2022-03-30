@@ -1,38 +1,64 @@
-#from concurrent.futures.process import _python_exit
-#from email.header import decode_header
-from http import client
+# from re import X
+# import string
+# from sys import exit
+# from http import client
 import json
 import sqlite3
-
-
-from tokenize import Double
-from traceback import print_tb
+import win32api
+from winerror import ERROR_ALREADY_EXISTS
+import win32event
+import yaml
+# from tokenize import Double
+# from traceback import print_tb
 from datetime import datetime, date
 from numpy import product
+# import threading
 
-#from pydoc import cli
-#import re
-#from turtle import color
 from sqlalchemy import ForeignKey, create_engine, Integer, String, Boolean, Date, Column
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session, sessionmaker, relationship
 import socket
-
+import hashlib
+from exceptions import *
 
 import logging
+from memcache import *
+from pymemcache.client import base
 
-logging.basicConfig(filename='log.log',
-                    format='%(asctime)s - %(message)s', level=logging.INFO)
+with open('settings') as conf:
+    # config = configparser.ConfigParser()
+    conf = yaml.safe_load(conf)
+salt = conf['salt']
 
+file_log = logging.FileHandler('log.log')
+console_log = logging.StreamHandler()
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+    datefmt="%d.%b.%Y %H:%M:%S",
+    handlers=(file_log, console_log))
+log = logging.getLogger('server')
 
-e = create_engine("sqlite:///mydatabase.db")
+# e = create_engine("sqlite:///mydatabase.db")
 
 # e = create_engine("postgresql+psycopg2://postgres:123@localhost/postgres")
 
 Base = declarative_base()
 
 
-s = Session(bind=e)
+client = conf['client']
+
+# client.set('some_key', 'some value')
+
+# client.get('some_key') # 'some value'
+
+s = Session(bind=create_engine(conf['engine_sqlite']))
+
+
+def object_to_dict(ob):
+    return {x.name: (str(getattr(ob, x.name)))
+            for x in ob.__table__.columns
+            }
 
 
 class User(Base):
@@ -48,51 +74,40 @@ class User(Base):
 
     order = relationship("Order", back_populates='courier')
 
-    def add_client(client):
 
-        # data=client["data"]
-        c = User()
-        c.name = ["name"]
-        c.phone = ["phone"]
-        c.birthday = ["birthday"]
-
-        c.token = "234567sfdghgh3546"
-
-        s.add(c)
-        s.commit()
-
-        return True
 
     def auth(data):
-
         user = s.query(User).filter(User.phone == data['phone']).first()
-
-        if user.password == data['password']:
-            data['id'] = user.id
-            data['surname'] = user.surname
-            data['name'] = user.name
-            data['patronymic'] = user.patronymic
-            data['birthday'] = str(user.birthday)
-            data['token'] = user.token
+        salt_ = hashlib.sha256(
+            data['password'].encode()+salt.encode()).hexdigest()
+        if user.password == salt_:
+            
+            data = object_to_dict(user)
+            data['password']=user.password
             return data
 
-    def edit_profile(data):
-        courier = s.query(User).filter(User.token == data['token']).first()
-        courier.name = data['data']['name']
+    def edit_profile(data, courier):
+
+        courier.name = data['name']
 
         s.add(courier)
         s.commit()
 
-        return data['data']
+        return data
 
-    def edit_password(data):
-        courier = s.query(User).filter(User.token == data['token']).first()
-        if (courier.password == data['data']['old_password'] and data['data']['new_password'] == data['data']['new_password1']):
-            courier.password = data['data']['new_password']
+    def edit_password(data, courier):
+        data['old_password'] = hashlib.sha256(
+            data['old_password'].encode() + salt.encode()).hexdigest()
+        data['new_password1'] = hashlib.sha256(
+            data['new_password1'].encode() + salt.encode()).hexdigest()
+        data['new_password'] = hashlib.sha256(
+            data['new_password'].encode() + salt.encode()).hexdigest()
+        if (courier.password == data['old_password'] and data['new_password'] == data['new_password1']):
+
+            courier.password =  data['new_password']
             s.add(courier)
             s.commit()
-
-            return data['data']
+            return data
 
 
 class Order(Base):
@@ -107,69 +122,50 @@ class Order(Base):
     date_pay = Column(Date, nullable=False)
     sum = Column(Integer, nullable=False)
     status_order = Column(Integer, nullable=False)
-
     note = Column(String(250), nullable=False)
 
     courier = relationship("User", back_populates="order")
 
     content_order = relationship("OrderContent", back_populates='order')
 
-    def all_orders(data):
-        courier = s.query(User).filter(User.token == data['token']).first()
+    def all_orders(data, courier):
         orders = courier.order
         new_orders = []  # [{} {} {}]
         for order in orders:
-            data = {}
-            data = Order.print_order(order, data)
+            data = object_to_dict(order)
+            # data = Order.print_order(order, data)
 
             new_orders.append(data)
         data = new_orders
         return data
 
-    def get_order(data):
-        courier = s.query(User).filter(User.token == data['token']).first()
-
-        order = s.query(Order).get(data['data']['id'])
+    def get_order(data, courier):
+        order = s.query(Order).get(data['id'])
         if order in courier.order:
-            data = Order.print_order(order, data['data'])
+            data = object_to_dict(order)
 
             return data
 
-    def print_order(order, a):
+    def edit_note(data, courier):
 
-        a['id'] = order.id
-        a['courier_id'] = order.courier_id
-        a['florist_id'] = order.florist_id
-        a['client_id'] = order.client_id
-        a['address'] = order.address
-        a['date_order'] = str(order.date_order)
-        a['date_delivery'] = str(order.date_delivery)
-        a['date_pay'] = str(order.date_pay)
-        a['sum'] = order.sum
-        a['status_order'] = order.status_order
-        a['note'] = order.note
-        return a
-
-    def edit_note(data):
-        courier = s.query(User).filter(User.token == data['token']).first()
-        order = s.query(Order).get(data['data']['id'])
+        order = s.query(Order).get(data['id'])
 
         if order in courier.order:
-            order.note = data['data']['note']
+            order.note = data['note']
             s.add(order)
             s.commit()
 
-            return data['data']
 
-    def edit_status(data):
-        courier = s.query(User).filter(User.token == data['token']).first()
-        order = s.query(Order).get(data['data']['id'])
+            return data
+
+    def edit_status(data, courier):
+        order = s.query(Order).get(data['id'])
         if order in courier.order:
-            order.status_order = data['data']['status_order']
+            order.status_order = data['status_order']
             s.add(order)
             s.commit()
 
-            return data['data']
+            return data
 
 
 class Product(Base):
@@ -200,10 +196,8 @@ class OrderContent(Base):
     order = relationship("Order", back_populates="content_order")
     product = relationship("Product", back_populates="content_product")
 
-    def order_content(data):
-        courier = s.query(User).filter(User.token == data['token']).first()
-
-        order = s.query(Order).get(data['data']['id_order'])
+    def order_content(data, courier):
+        order = s.query(Order).get(data['id_order'])
         if order in courier.order:
 
             order_c = order.content_order
@@ -211,16 +205,10 @@ class OrderContent(Base):
             for product in order_c:
                 data = {}
                 product_ = s.query(Product).get(product.product_id)
-                data['id'] = product_.id
-                data['name'] = product_.name
-                data['subcategory_id'] = product_.subcategory_id
-                data['description'] = product_.description
-                data['supplier_id'] = product_.supplier_id
-                data['price'] = product_.price
-                data['show'] = product_.show
-                data['article'] = product_.article
+                data = object_to_dict(product_)
                 new_orders.append(data)
             data = new_orders
+
             return(data)
 
 
@@ -229,60 +217,83 @@ class OrderContent(Base):
 
 def server_connect():
 
-    ADDRESS = '127.0.0.1'
-    PORT = 8000
-
+    # ADDRESS = '127.0.0.1'
+    # PORT = 8000
+    port = conf['port']
+    address = conf['address']
     soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    soc.bind((ADDRESS, PORT))
+    soc.bind((address, port))
 
     soc.listen(1)
 
-    print("work")
-
+    log.info('Work:'+str(address))
+    menu_dict = {
+        'auth': User.auth,
+        'all_orders': Order.all_orders,
+        'get_order': Order.get_order,
+        'edit_note': Order.edit_note,
+        'edit_status': Order.edit_status,
+        'order_content': OrderContent.order_content,
+        'edit_profile': User.edit_profile,
+        'edit_password': User.edit_password
+    }
     while 1:
         connection, address = soc.accept()
-        print('Клиент подключен', address)
-        logging.warning('Клиент подключен' + str(address))
+        print('client connection', address)
+        logging.warning('client connection' + str(address))
 
         while 1:
-            query_client = connection.recv(1024)
-            decode_query = query_client.decode()
+            try:
+                query_client = connection.recv(1024)
+                decode_query = query_client.decode()
 
-            json_query = json.loads(decode_query)
+                json_query = json.loads(decode_query)
+                print(json_query)
+            except:
+                log.error('Error!')
+
+            if not json_query:
+                log.info('Disconnected:' + str(address))
+                break
+            try:
+                com = json_query['command']
+                if com == 'auth':
+                    json_query['data'] = menu_dict.get(
+                        com)(json_query['data'])
+                    print(json_query)
+
+                else:
+                    courier = s.query(User).filter(
+                        User.token == json_query['token']).first()
+                    json_query['data'] = menu_dict.get(
+                        com)(json_query['data'], courier)
+            except NotFoundError as er:
+                json_query['message'] = er.message
+                log.warning('Not Found!')
+            except InternalServerError as er:
+                json_query['message'] = er.message
+            except ErrorUnauthorized as er:
+                json_query['message'] = er.message
+                log.error('Unauthorized Error!')
+            try:
+                connection.sendall(bytes(json.dumps(json_query), 'UTF-8'))
+            except:
+                log.error('Sending Error!')
             print(json_query)
 
-            if json_query["command"] == 'auth':
-                json_query['data'] = User.auth(json_query['data'])
 
-            if json_query['command'] == 'all_orders':
-                json_query['data'] = Order.all_orders(json_query)
+class single_example:
+    def __init__(self):
+        self.mutex_name = "testmutex_{b5123b4b-e59c-4ec7-a912-51be8ebd5819}"
+        self.mutex = win32event.CreateMutex(None, 1, self.mutex_name)
+        self.last_error = win32api.GetLastError()
 
-            if json_query['command'] == 'get_order':
-
-                json_query['data'] = Order.get_order(
-                    json_query)
-
-            if json_query['command'] == 'edit_note':
-                json_query['data'] = Order.edit_note(
-                    json_query)
-
-            if json_query['command'] == 'edit_status':
-                json_query['data'] = Order.edit_status(
-                    json_query)
-
-            if json_query['command'] == 'order_content':
-                json_query['data'] = OrderContent.order_content(
-                    json_query)
-            if json_query['command'] == 'edit_profile':
-                json_query['data'] = User.edit_profile(
-                    json_query)
-            if json_query['command'] == 'edit_password':
-                json_query['data'] = User.edit_password(
-                    json_query)
-
-            connection.sendall(bytes(json.dumps(json_query), 'UTF-8'))
-
-            print(json_query)
+    def already_working(self):
+        return (self.last_error == ERROR_ALREADY_EXISTS)
 
 
-server_connect()
+app = single_example()
+# if app.already_working():
+#     print("Server is running")
+#     exit(0)
+# server_connect()

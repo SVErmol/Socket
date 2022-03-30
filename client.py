@@ -1,150 +1,71 @@
 import json
-from platform import java_ver
+# from platform import java_ver
 import socket
 from os import urandom
-from numpy import product
+# from numpy import product
 import binascii
+# from flask_bcrypt import Bcrypt
+# import imp
 
-# from server import Order
+soc = socket.socket()
 
 
 def client_connect():
-    soc = socket.socket()
 
     soc.connect(('127.0.0.1', 8000))
 
-    auth = 0
     query_client = {}
 
     while 1:
 
         print()
-        if auth == 0:
+        if (query_client == {}) or not ('token' in query_client):
             print("Авторизиризация")
-            task = "1"
+            task = 0
 
-        if auth == 1:
+        else:
             print("Выберите действие:")
-            print("2-Просмотреть список заказов")
-            print("3-Просмотреть данные заказа")
-            print("4-Изменить комментарий к заказу")
-            print("5-Изменить статус заказа")
-            print("6-Посмотреть содержимое заказа")
-            print("7-Изменить личный профиль")
-            print("8-Поменять пароль")
-            print("9-Выйти из личного кабинета")
+            print("1-Просмотреть список заказов")
+            print("2-Просмотреть данные заказа")
+            print("3-Изменить комментарий к заказу")
+            print("4-Изменить статус заказа")
+            print("5-Посмотреть содержимое заказа")
+            print("6-Изменить личный профиль")
+            print("7-Поменять пароль")
+            print("8-Выйти из личного кабинета")
 
-            task = input()
+            task = int(input())
 
         # soc.sendall(bytes(task,'UTF-8'))
+        menu_dict = {
+            0: ['auth', author],
+            1: ['all_orders', all_orders],
+            2: ['get_order', get_order],
+            3: ['edit_note', edit_note],
+            4: ['edit_status', edit_status],
+            5: ['order_content', order_content],
+            6: ['edit_profile', edit_profile],
+            7: ['edit_password', edit_password],
+            8: ['out', out]
+        }
 
-        query_client["i_key"] = binascii.hexlify(urandom(20)).decode()
+        try:
+            md = menu_dict.get(task)
+            query_client["command"] = md[0]
 
-        # if task=="1":
-        #     query_client["data"]=add_client()
-        # if json_client["status"]==True:
-        #     print("yes")
-
-        # if task=="2":
-        #     # query_client["task"]=task
-        #     # query_client["i_key"]="987654321"
-        #     # query_client["token"]=""
-        #     # query_client["data"]=all_orders()
-
-        if task == "1":
-            query_client["command"] = "auth"
-
-            query_client["data"] = author()
-
-        if task == "2":
-
-            query_client["command"] = "all_orders"
-
-        if task == "3":
-            query_client["command"] = "get_order"
-
-            query_client["data"] = get_order()
-
-        if task == "4":
-            query_client["command"] = "edit_note"
-
-            query_client["data"] = edit(task)
-
-        if task == "5":
-            query_client["command"] = "edit_status"
-
-            query_client["data"] = edit(task)
-
-        if task == "6":
-            query_client["command"] = "order_content"
-
-            query_client["data"] = order_content()
-
-        if task == "7":
-            query_client["command"] = "edit_profile"
-
-            query_client["data"] = edit_profile()
-
-        if task == "8":
-            query_client["command"] = "edit_password"
-
-            query_client["data"] = edit_password()
-
-        json_client = convertjson(query_client, soc)
-        exc(query_client["command"], json_client)
-        if task == '1':
-            try:
-                print('Добро пожаловать,',
-                      json_client['data']['surname'], json_client['data']['name'])
-                auth = 1
-                query_client["token"] = json_client['data']['token']
-            except:
-                print()
-
-        if task == "9":
-            auth = 0
-
-        if not task.isdigit() or int(task) > 9:
-            print("error")
-
-            # if task=="1":
-            #     print(json_client)
-
-            #     print('Вы успешно зарегистрировались! Ваш id: ', json_client['id'])
+            query_client = md[1](query_client)
+        except:
+            if query_client["command"] != 'auth':
+                print('Введите команду правильно')
+            else:
+                print('Неправильный логин или пароль')
 
 
-def exc(command, json_client):
-    try:
+def out(query_client):
+    print(query_client)
+    query_client = {}
 
-        if (command == 'all_orders'):
-            for order in json_client['data']:
-                print('Id заказа:',  order['id'])
-
-                print_order(order)
-        if (command == 'get_order'):
-            print_order(json_client['data'])
-        if (command == 'edit_note'):
-            print('Примечание заказа №',
-                  json_client['data']['id'], 'успешно изменено')
-        if (command == 'edit_note'):
-            print('Примечание заказа №',
-                  json_client['data']['id'], 'успешно изменено')
-        if (command == 'edit_status'):
-            print('Статус заказа №',
-                  json_client['data']['id'], 'успешно изменен')
-        if (command == 'order_content'):
-            for product in json_client['data']:
-                print_product(product)
-        if (command == 'edit_profile'):
-            print("Ваши данные успешно изменены")
-        if (command == 'edit_password'):
-            print("Пароль успешно изменен")
-        if json_client['data'] == None:
-            print('error')
-
-    except:
-
-        print('error')
+    return query_client
 
 
 def print_order(order):
@@ -161,7 +82,7 @@ def print_order(order):
     print('Примечание: ',  order['note'])
 
 
-def convertjson(query_client, soc):
+def send_get(query_client):
     json_client = json.dumps(query_client)
     soc.sendall(bytes(json_client, 'UTF-8'))
 
@@ -185,65 +106,98 @@ def show(json_client):
         status_ord = 'Не скрыто'
     return status_ord
 
-# def add_client():
-#     data={}
 
-
-#     print("Введите имя")
-#     data ['name']=input()
-#     print("Введите номер телефона")
-#     data ['phone']=input()
-
-#     print("Введите дату рождения в формате ГГГГ-ММ-ДД")
-
-#     data ['birthday']=input()
-#     return data
-
-
-def author():
+def author(query_client):
+    print(query_client)
     data = {}
     print('Введите номер телефона')
     data['phone'] = input()
     print('Введите пароль')
     data['password'] = input()
-    return data
+
+    query_client['data'] = data
+    json_client = send_get(query_client)
+    query_client["i_key"] = binascii.hexlify(urandom(20)).decode()
+    print()
+    print('Добро пожаловать,',
+          json_client['data']['surname'], json_client['data']['name'])
+    query_client["token"] = json_client['data']['token']
+    print(query_client)
+
+    return query_client
 
 
-def get_order():
+def get_order(query_client):
     print('Введите id заказа')
     task_order = input()
     task_order = int(task_order)
     data = {}
     data['id'] = task_order
+    query_client['data'] = data
+    json_client = send_get(query_client)
+    print_order(json_client['data'])
 
-    return data
+    return query_client
 
 
-def edit(task):
+def all_orders(query_client):
+
+    json_client = send_get(query_client)
+
+    for order in json_client['data']:
+        print('Id заказа:',  order['id'])
+
+        print_order(order)
+        print()
+    return query_client
+
+
+def edit_note(query_client):
     data = {}
 
     print('Введите id заказа')
     data['id'] = input()
-    if (task == "4"):
-        print("Введите примечание")
-        data['note'] = input()
-    else:
-        print("Введите статус")
-        print("0-Принят")
-        print("1-Доставлен")
-        data['status_order'] = input()
-    return data
+    print("Введите примечание")
+    data['note'] = input()
+
+    query_client['data'] = data
+
+    json_client = send_get(query_client)
+    print('Примечание заказа №',
+          json_client['data']['id'], 'успешно изменено')
+    return json_client
 
 
-def order_content():
+def edit_status(query_client):
+    data = {}
+
+    print('Введите id заказа')
+    data['id'] = input()
+    print("Введите статус")
+    print("0-Принят")
+    print("1-Доставлен")
+    data['status_order'] = input()
+    query_client['data'] = data
+
+    json_client = send_get(query_client)
+    print('Статус заказа №',
+          json_client['data']['id'], 'успешно изменен')
+    return json_client
+
+
+def order_content(query_client):
     data = {}
     print('Введите id заказа')
     task_order = input()
     task_order = int(task_order)
     data = {}
     data['id_order'] = task_order
+    query_client['data'] = data
 
-    return data
+    json_client = send_get(query_client)
+    for product in json_client['data']:
+        print_product(product)
+    return json_client
 
 
 def print_product(product):
@@ -258,16 +212,20 @@ def print_product(product):
     print('Артикул товара:',  product['article'])
 
 
-def edit_profile():
+def edit_profile(query_client):
     data = {}
 
     print('Введите имя')
     data['name'] = input()
 
-    return data
+    query_client['data'] = data
+
+    json_client = send_get(query_client)
+    print("Ваши данные успешно изменены")
+    return json_client
 
 
-def edit_password():
+def edit_password(query_client):
     data = {}
     print('Введите старый пароль')
     data['old_password'] = input()
@@ -275,7 +233,11 @@ def edit_password():
     data['new_password'] = input()
     print('Подтвердите новый пароль')
     data['new_password1'] = input()
-    return data
+    query_client['data'] = data
+
+    json_client = send_get(query_client)
+    print("Ваш пароль успешно изменен")
+    return json_client
 
 
-client_connect()
+# client_connect()
