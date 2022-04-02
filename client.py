@@ -120,7 +120,7 @@ def author(query_client):
     query_client["i_key"] = binascii.hexlify(urandom(20)).decode()
     print()
     print('Добро пожаловать,',
-          json_client['data']['surname'], json_client['data']['name'])
+           json_client['data']['surname'], json_client['data']['name'])
     query_client["token"] = json_client['data']['token']
     print(query_client)
 

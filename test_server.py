@@ -17,12 +17,12 @@ class TestUser(unittest.TestCase):
 
     @patch('binascii.hexlify', side_effect=test_token)
     def test_0_auth(self, mock_token):
-        data = {'phone': '123', 'password': '345'}
+        data = {'phone': '123', 'password': '123'}
 
         result = User.auth(data)
         ex_result = {'id': '1', 'surname': 'Петренко', 'name': 'Татьяна', 'patronymic': 'Григорьевна', 'phone': '123',
                      'birthday': '1999-04-14',
-                     'password': '009ddd84de448cad7b31f727504f98347e733975b2b99a17669be7fe6d1ce070',
+                     'password': 'c109f3814c4384bf7f164ebd2464aa8e02e7aa6815bb976def08de39df3acde7',
                      'token': '23453234567u8765432asdfghhgtrew'}
         self.assertEqual(result, ex_result)
 
@@ -45,12 +45,12 @@ class TestUser(unittest.TestCase):
         self.assertEqual(result, ex_result)
 
     def test_7_edit_password(self):
-        data = {'old_password': '345', 'new_password': '345', 'new_password1': '345'}
+        data = {'old_password': '123', 'new_password': '123', 'new_password1': '123'}
 
         result = User.edit_password(data, self.courier)
-        ex_result = {'old_password': '009ddd84de448cad7b31f727504f98347e733975b2b99a17669be7fe6d1ce070',
-                     'new_password': '009ddd84de448cad7b31f727504f98347e733975b2b99a17669be7fe6d1ce070',
-                     'new_password1': '009ddd84de448cad7b31f727504f98347e733975b2b99a17669be7fe6d1ce070'}
+        ex_result = {'old_password': 'c109f3814c4384bf7f164ebd2464aa8e02e7aa6815bb976def08de39df3acde7',
+                     'new_password': 'c109f3814c4384bf7f164ebd2464aa8e02e7aa6815bb976def08de39df3acde7',
+                     'new_password1': 'c109f3814c4384bf7f164ebd2464aa8e02e7aa6815bb976def08de39df3acde7'}
         self.assertEqual(result, ex_result)
 
 
@@ -60,7 +60,7 @@ class TestOrder(unittest.TestCase):
             User.token == test_token().decode()).first()
 
     def test_2_all_orders(self):
-        data = {'phone': '123', 'password': '009ddd84de448cad7b31f727504f98347e733975b2b99a17669be7fe6d1ce070'}
+        data = {'phone': '123', 'password': 'c109f3814c4384bf7f164ebd2464aa8e02e7aa6815bb976def08de39df3acde7'}
         result = Order.all_orders(data, self.courier)
         ex_result = [{'id': '1', 'courier_id': '1', 'florist_id': '2', 'client_id': '3', 'address': 'Ленина 13',
                       'date_order': '2022-01-01', 'date_delivery': '2022-01-20', 'date_pay': '2022-01-20',

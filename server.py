@@ -56,12 +56,29 @@ s = Session(bind=create_engine(conf['engine_sqlite']))
 
 
 def object_to_dict(ob):
+    """
+    Метод для преобразования объекта в словарь
+    :param ob: объект
+    :return: словарь
+    """
     return {x.name: (str(getattr(ob, x.name)))
             for x in ob.__table__.columns
             }
 
 
 class User(Base):
+    """
+    Класс пользователя
+
+    id-id пользователя
+    surname-фамилия пользователя
+    name-имя пользователя
+    patronymic-отчество пользователя
+    phone-номер телефона
+    birthday-дата рождения
+    password-пароль
+    token-токен
+    """
     __tablename__ = 'users'
     id = Column(Integer, primary_key=True)
     surname = Column(String(250), nullable=False)
@@ -77,6 +94,11 @@ class User(Base):
 
 
     def auth(data):
+        """
+        Метод для авторизации пользователя
+         :param data: словарь с номером телефона и паролем
+        :return: словарь с информацией о пользователе
+        """
         user = s.query(User).filter(User.phone == data['phone']).first()
         salt_ = hashlib.sha256(
             data['password'].encode()+salt.encode()).hexdigest()
@@ -87,7 +109,12 @@ class User(Base):
             return data
 
     def edit_profile(data, courier):
+        """
 
+        :param courier: объект типа User
+                data: словарь с информацией, которую хочет изменить пользователь
+        :return: data: словарь с измененной информацией
+        """
         courier.name = data['name']
 
         s.add(courier)
@@ -96,6 +123,12 @@ class User(Base):
         return data
 
     def edit_password(data, courier):
+        """
+
+              :param courier: объект типа User
+                      data: словарь с новым и старым паролем
+              :return: data: словарь с измененным паролем
+              """
         data['old_password'] = hashlib.sha256(
             data['old_password'].encode() + salt.encode()).hexdigest()
         data['new_password1'] = hashlib.sha256(
@@ -111,6 +144,22 @@ class User(Base):
 
 
 class Order(Base):
+    """
+    Класс заказа
+
+    id-id заказа
+    courier_id-id курьера
+    florist_id-id флориста
+    client_id-id клиента
+    address-адрес заказа
+    date_order-дата заказа
+    date_delivery-дата доставки
+    date_pay-дата оплаты
+    sum-сумма оплаты
+    status_order-статус заказа
+    note-комментарий
+
+    """
     __tablename__ = 'orders'
     id = Column(Integer, primary_key=True)
     courier_id = Column(Integer, ForeignKey('users.id'), nullable=True)
@@ -129,6 +178,12 @@ class Order(Base):
     content_order = relationship("OrderContent", back_populates='order')
 
     def all_orders(data, courier):
+        """
+
+          :param courier: объект типа User
+                      data: словарь с данными
+        :return: data: словарь с информацией о заказаз курьера
+        """
         orders = courier.order
         new_orders = []  # [{} {} {}]
         for order in orders:
@@ -140,6 +195,12 @@ class Order(Base):
         return data
 
     def get_order(data, courier):
+        """
+
+               :param courier: объект типа User
+                           data: словарь с данными о номере заказа
+             :return: data: словарь с информацией о контретном заказе
+             """
         order = s.query(Order).get(data['id'])
         if order in courier.order:
             data = object_to_dict(order)
@@ -147,7 +208,12 @@ class Order(Base):
             return data
 
     def edit_note(data, courier):
+        """
 
+                    :param courier: объект типа User
+                                data: словарь с данными о номере заказа и комментарии
+                  :return: data: словарь с информацией измененного заказа
+                  """
         order = s.query(Order).get(data['id'])
 
         if order in courier.order:
@@ -159,6 +225,12 @@ class Order(Base):
             return data
 
     def edit_status(data, courier):
+        """
+
+                         :param courier: объект типа User
+                                     data: словарь с данными о номере заказа и статусе
+                       :return: data: словарь с информацией измененного заказа
+                       """
         order = s.query(Order).get(data['id'])
         if order in courier.order:
             order.status_order = data['status_order']
@@ -169,6 +241,20 @@ class Order(Base):
 
 
 class Product(Base):
+    """
+     Класс товара
+
+     id-id товара
+     name-название товара
+     subcategory_id-id категории
+     photos-фото
+     description-описание
+     supplier_id-id поставщика
+     price-цена
+     show-скрывать/показывать
+     article-артикул
+
+     """
     __tablename__ = 'products'
     id = Column(Integer, primary_key=True)
     name = Column(String(250), nullable=False)
@@ -185,7 +271,16 @@ class Product(Base):
 
 
 class OrderContent(Base):
+    """
+     Класс содержимого заказа
 
+     id-id
+     order_id-id
+     product_id-id товара
+     quanity-количество
+
+
+     """
     __tablename__ = 'ordercontent'
     id = Column(Integer, primary_key=True)
 
@@ -197,6 +292,12 @@ class OrderContent(Base):
     product = relationship("Product", back_populates="content_product")
 
     def order_content(data, courier):
+        """
+
+         :param courier: объект типа User
+                                     data: словарь с данными о номере заказа
+                       :return: data: словарь с информацией содержимого заказа
+        """
         order = s.query(Order).get(data['id_order'])
         if order in courier.order:
 
@@ -293,7 +394,7 @@ class single_example:
 
 
 app = single_example()
-# if app.already_working():
-#     print("Server is running")
-#     exit(0)
-# server_connect()
+if app.already_working():
+    print("Server is running")
+    exit(0)
+server_connect()
